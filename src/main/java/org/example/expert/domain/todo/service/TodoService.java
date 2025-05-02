@@ -9,6 +9,7 @@ import org.example.expert.domain.common.exception.InvalidRequestException;
 import org.example.expert.domain.todo.dto.request.TodoSaveRequest;
 import org.example.expert.domain.todo.dto.response.TodoResponse;
 import org.example.expert.domain.todo.dto.response.TodoSaveResponse;
+import org.example.expert.domain.todo.dto.response.TodoSearchResponse;
 import org.example.expert.domain.todo.entity.Todo;
 import org.example.expert.domain.todo.repository.TodoRepository;
 import org.example.expert.domain.user.dto.response.UserResponse;
@@ -92,5 +93,18 @@ public class TodoService {
 			todo.getCreatedAt(),
 			todo.getModifiedAt()
 		);
+	}
+
+	@Transactional(readOnly = true)
+	public Page<TodoSearchResponse> searchTodos(String keyword, String managerNickname, LocalDate createdFrom, LocalDate createdTo,
+		Pageable pageable) {
+		if ((createdFrom != null && createdTo == null || (createdFrom == null && createdTo != null))) {
+			throw new InvalidRequestException("생성일 검색은 시작일과 종료일을 모두 입력해야 합니다.");
+		}
+
+		LocalDateTime startDateTime = createdFrom != null ? createdFrom.atStartOfDay() : null;
+		LocalDateTime endDateTime = createdTo != null ? createdTo.atTime(23, 59, 59) : null;
+
+		return todoRepository.searchTodos(keyword, managerNickname, startDateTime, endDateTime, pageable);
 	}
 }
