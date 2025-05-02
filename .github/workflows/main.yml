@@ -52,8 +52,11 @@ jobs:
                 kill -9 $pid
               fi
             done
-            nohup java -jar ~/*.jar \
-            -DMYSQL_URL=${{ secrets.MYSQL_URL }} \
-            -DMYSQL_USERNAME=${{ secrets.MYSQL_USERNAME }} \
-            -DMYSQL_PASSWORD=${{ secrets.MYSQL_PASSWORD }} \
-            > ~/app.log 2>&1 &
+            
+            export MYSQL_URL=${{ secrets.MYSQL_URL }}
+            export MYSQL_USERNAME=${{ secrets.MYSQL_USERNAME }}
+            export MYSQL_PASSWORD=${{ secrets.MYSQL_PASSWORD }}
+            
+            echo "MYSQL_URL"
+            
+            nohup java -jar ~/*.jar > ~/app.log 2>&1 &
