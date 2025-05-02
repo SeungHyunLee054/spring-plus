@@ -36,12 +36,6 @@ jobs:
           target: "~"
           strip_components: 2
 
-      - name: Set environment variables for EC2
-        run: |
-          echo "MYSQL_URL=${{ secrets.MYSQL_URL }}" >> $GITHUB_ENV
-          echo "MYSQL_USERNAME=${{ secrets.MYSQL_USERNAME }}" >> $GITHUB_ENV
-          echo "MYSQL_PASSWORD=${{ secrets.MYSQL_PASSWORD }}" >> $GITHUB_ENV
-
       - name: SSH Commands
         uses: appleboy/ssh-action@v0.1.6
         with:
@@ -58,4 +52,8 @@ jobs:
                 kill -9 $pid
               fi
             done
-            nohup java -jar ~/*.jar > ~/app.log 2>&1 &
+            nohup java -jar ~/*.jar \
+            -DMYSQL_URL=${{ secrets.MYSQL_URL }} \
+            -DMYSQL_USERNAME=${{ secrets.MYSQL_USERNAME }} \
+            -DMYSQL_PASSWORD=${{ secrets.MYSQL_PASSWORD }} \
+            > ~/app.log 2>&1 &
