@@ -1,5 +1,6 @@
 package org.example.expert.domain.auth.service;
 
+import org.example.expert.client.s3.S3Service;
 import org.example.expert.config.JwtUtil;
 import org.example.expert.config.PasswordEncoder;
 import org.example.expert.domain.auth.dto.request.SigninRequest;
@@ -24,6 +25,7 @@ public class AuthService {
 	private final UserRepository userRepository;
 	private final PasswordEncoder passwordEncoder;
 	private final JwtUtil jwtUtil;
+	private final S3Service s3Service;
 
 	@Transactional
 	public SignupResponse signup(SignupRequest signupRequest) {
@@ -35,10 +37,13 @@ public class AuthService {
 
 		UserRole userRole = UserRole.of(signupRequest.getUserRole());
 
+		String profileImageUrl = s3Service.uploadAndGetUrl(signupRequest.getProfileImage());
+
 		User newUser = User.builder()
 			.email(signupRequest.getEmail())
 			.password(encodedPassword)
 			.nickname(signupRequest.getNickname())
+			.profileImage(profileImageUrl)
 			.userRole(userRole)
 			.build();
 
