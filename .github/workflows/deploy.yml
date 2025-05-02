@@ -19,15 +19,6 @@ jobs:
           java-version: '17'
           distribution: 'adopt'
 
-      - name: Set environment
-        uses: microsoft/variable-substitution@v1
-        with:
-          files: ./src/main/resources/application.yml
-        env:
-          spring.datasource.url: ${{ secrets.MYSQL_URL }}
-          spring.datasource.username: ${{ secrets.MYSQL_USERNAME }}
-          spring.datasource.password: ${{ secrets.MYSQL_PASSWORD }}
-
       - name: Grant execute permission for gradlew
         run: chmod +x ./gradlew
 
