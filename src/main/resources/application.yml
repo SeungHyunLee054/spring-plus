@@ -26,6 +26,12 @@ spring:
         format_sql: true
         use_sql_comments: true
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
 jwt:
   secret:
     key: yourSuperSecretKey1234567890yourSuperSecretKey1234567890
