@@ -6,11 +6,10 @@ import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
@@ -18,6 +17,7 @@ import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class S3Service {
@@ -26,7 +26,6 @@ public class S3Service {
 	@Value("${cloud.aws.s3.bucket}")
 	private String bucket;
 
-	@Transactional(propagation = Propagation.REQUIRES_NEW)
 	public String uploadAndGetUrl(MultipartFile multipartFile) {
 		String extension = Objects.requireNonNull(multipartFile.getOriginalFilename())
 			.substring(multipartFile.getOriginalFilename().lastIndexOf("."));
@@ -45,11 +44,11 @@ public class S3Service {
 
 			return String.format("https://%s.s3.ap-northeast-2.amazonaws.com/%s", bucket, fileName);
 		} catch (Exception e) {
-			throw new RuntimeException("S3 업로드 실패", e);
+			log.error("S3 업로드 실패 : {}", e.getMessage(), e);
+			return null;
 		}
 	}
 
-	@Transactional(propagation = Propagation.REQUIRES_NEW)
 	public void deleteFileIfPresent(String profileImageUrl) {
 		if (profileImageUrl == null || profileImageUrl.isBlank()) {
 			return;
@@ -75,8 +74,7 @@ public class S3Service {
 					.key(fileName)
 					.build());
 		} catch (Exception e) {
-			throw new RuntimeException("S3 파일 삭제 실패", e);
-
+			log.error("S3 파일 삭제 실패 : {}", e.getMessage(), e);
 		}
 	}
 }
