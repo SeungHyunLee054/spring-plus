@@ -57,6 +57,6 @@ jobs:
             export MYSQL_USERNAME=${{ secrets.MYSQL_USERNAME }}
             export MYSQL_PASSWORD=${{ secrets.MYSQL_PASSWORD }}
             
-            echo "MYSQL_URL"
+            echo "MYSQL_URL : $MYSQL_URL"
             
             nohup java -jar ~/*.jar > ~/app.log 2>&1 &
