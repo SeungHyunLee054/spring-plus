@@ -19,6 +19,15 @@ jobs:
           java-version: '17'
           distribution: 'adopt'
 
+      - name: Set environment
+        uses: microsoft/variable-substitution@v1
+        with:
+          files: ./src/main/resources/application.yml
+        env:
+          spring.datasource.url: ${{ secrets.MYSQL_URL }}
+          spring.datasource.username: ${{ secrets.MYSQL_USERNAME }}
+          spring.datasource.password: ${{ secrets.MYSQL_PASSWORD }}
+
       - name: Grant execute permission for gradlew
         run: chmod +x ./gradlew
 
@@ -52,11 +61,5 @@ jobs:
                 kill -9 $pid
               fi
             done
-            
-            export MYSQL_URL=${{ secrets.MYSQL_URL }}
-            export MYSQL_USERNAME=${{ secrets.MYSQL_USERNAME }}
-            export MYSQL_PASSWORD=${{ secrets.MYSQL_PASSWORD }}
-            
-            echo "MYSQL_URL : $MYSQL_URL"
             
             nohup java -jar ~/*.jar > ~/app.log 2>&1 &
