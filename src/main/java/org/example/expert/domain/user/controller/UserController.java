@@ -3,6 +3,7 @@ package org.example.expert.domain.user.controller;
 import org.example.expert.domain.common.dto.AuthUser;
 import org.example.expert.domain.user.dto.request.UserChangePasswordRequest;
 import org.example.expert.domain.user.dto.response.UserResponse;
+import org.example.expert.domain.user.dto.response.UserSearchResponse;
 import org.example.expert.domain.user.service.UserService;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
@@ -26,6 +28,11 @@ public class UserController {
 	@GetMapping("/users/{userId}")
 	public ResponseEntity<UserResponse> getUser(@PathVariable long userId) {
 		return ResponseEntity.ok(userService.getUser(userId));
+	}
+
+	@GetMapping("/users")
+	public ResponseEntity<UserSearchResponse> getUserByNickname(@RequestParam String nickname) {
+		return ResponseEntity.ok(userService.getUserByNickname(nickname));
 	}
 
 	@PutMapping("/users")

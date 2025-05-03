@@ -5,6 +5,7 @@ import org.example.expert.config.PasswordEncoder;
 import org.example.expert.domain.common.exception.InvalidRequestException;
 import org.example.expert.domain.user.dto.request.UserChangePasswordRequest;
 import org.example.expert.domain.user.dto.response.UserResponse;
+import org.example.expert.domain.user.dto.response.UserSearchResponse;
 import org.example.expert.domain.user.entity.User;
 import org.example.expert.domain.user.repository.UserRepository;
 import org.springframework.stereotype.Service;
@@ -25,6 +26,14 @@ public class UserService {
 	public UserResponse getUser(long userId) {
 		User user = userRepository.findById(userId).orElseThrow(() -> new InvalidRequestException("User not found"));
 		return new UserResponse(user.getId(), user.getEmail());
+	}
+
+	@Transactional(readOnly = true)
+	public UserSearchResponse getUserByNickname(String nickname) {
+		User user = userRepository.findByNickname(nickname)
+			.orElseThrow(() -> new InvalidRequestException("User not found"));
+
+		return new UserSearchResponse(user.getId(), user.getNickname());
 	}
 
 	@Transactional

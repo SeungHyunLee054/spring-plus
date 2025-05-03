@@ -44,3 +44,10 @@ management:
     web:
       exposure:
         include: health
+
+cache:
+  caffeine:
+    initial-capacity: 50
+    maximum-size: 200
+    expire-after-write: 5
+    expire-after-access: 10
