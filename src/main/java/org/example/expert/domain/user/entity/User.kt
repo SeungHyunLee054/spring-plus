@@ -1,59 +1,50 @@
-package org.example.expert.domain.user.entity;
+package org.example.expert.domain.user.entity
 
-import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import org.example.expert.domain.common.dto.AuthUser;
-import org.example.expert.domain.common.entity.Timestamped;
-import org.example.expert.domain.user.enums.UserRole;
-import org.hibernate.annotations.DynamicInsert;
+import jakarta.persistence.*
+import org.example.expert.domain.common.dto.AuthUser
+import org.example.expert.domain.common.entity.Timestamped
+import org.example.expert.domain.user.enums.UserRole
+import org.hibernate.annotations.DynamicInsert
 
-@Getter
+
 @Entity
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-@Table(name = "users", indexes = {
-    @Index(name = "idx_user_nickname", columnList = "nickname")
-})
+@Table(name = "users", indexes = [Index(name = "idx_user_nickname", columnList = "nickname")])
 @DynamicInsert
-public class User extends Timestamped {
-
+class User(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    var id: Long? = null,
 
     @Column(unique = true)
-    private String email;
+    var email: String,
 
-    private String password;
+    var password: String? = null,
 
-    private String nickname;
+    var nickname: String? = null,
 
-    private String profileImage;
+    var profileImage: String? = null,
 
     @Enumerated(EnumType.STRING)
-    private UserRole userRole;
+    var userRole: UserRole? = null
+) : Timestamped() {
 
-    public static User fromAuthUser(AuthUser authUser) {
-        return User.builder()
-            .id(authUser.getId())
-            .email(authUser.getEmail())
-            .userRole(authUser.getUserRole())
-            .build();
+    fun changePassword(password: String) {
+        this.password = password
     }
 
-    public void changePassword(String password) {
-        this.password = password;
+    fun changeProfileImage(profileImage: String?) {
+        this.profileImage = profileImage
     }
 
-    public void changeProfileImage(String profileImage) {
-        this.profileImage = profileImage;
+    fun updateRole(userRole: UserRole) {
+        this.userRole = userRole
     }
 
-    public void updateRole(UserRole userRole) {
-        this.userRole = userRole;
+    companion object {
+        fun fromAuthUser(authUser: AuthUser) = User(
+            id = authUser.id,
+            email = authUser.email,
+            userRole = authUser.userRole
+        )
     }
 }

@@ -1,16 +1,11 @@
-package org.example.expert.domain.todo.dto.response;
+package org.example.expert.domain.todo.dto.response
 
-import lombok.AllArgsConstructor;
-import lombok.Getter;
+data class TodoSearchResponse(
+    val todoId: Long?,
 
-@Getter
-@AllArgsConstructor
-public class TodoSearchResponse {
-	private Long todoId;
+    val title: String?,
 
-	private String title;
+    val managerCount: Long = 0,
 
-	private Long managerCount;
-
-	private Long commentCount;
-}
+    val commentCount: Long = 0,
+)

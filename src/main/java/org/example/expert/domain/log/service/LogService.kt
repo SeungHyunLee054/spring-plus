@@ -1,26 +1,21 @@
-package org.example.expert.domain.log.service;
+package org.example.expert.domain.log.service
 
-import org.example.expert.domain.log.entity.Log;
-import org.example.expert.domain.log.repository.LogRepository;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
-
-import lombok.RequiredArgsConstructor;
+import org.example.expert.domain.log.entity.Log
+import org.example.expert.domain.log.repository.LogRepository
+import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Propagation
+import org.springframework.transaction.annotation.Transactional
 
 @Service
-@RequiredArgsConstructor
-public class LogService {
-	private final LogRepository logRepository;
+class LogService(private val logRepository: LogRepository) {
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    fun saveLog(requestUserId: Long?, managerUserId: Long?, todoId: Long?) {
+        val log = Log(
+            requestUserId = requestUserId,
+            managerUserId = managerUserId,
+            todoId = todoId
+        )
 
-	@Transactional(propagation = Propagation.REQUIRES_NEW)
-	public void saveLog(Long requestUserId, Long managerUserId, Long todoId) {
-		Log log = Log.builder()
-			.requestUserId(requestUserId)
-			.managerUserId(managerUserId)
-			.todoId(todoId)
-			.build();
-
-		logRepository.save(log);
-	}
+        logRepository.save(log)
+    }
 }

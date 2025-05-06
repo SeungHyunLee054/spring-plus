@@ -1,107 +1,107 @@
-package org.example.expert.domain.manager.service;
+package org.example.expert.domain.manager.service
 
-import java.util.ArrayList;
-import java.util.List;
+import org.example.expert.domain.common.dto.AuthUser
+import org.example.expert.domain.common.exception.InvalidRequestException
+import org.example.expert.domain.log.service.LogService
+import org.example.expert.domain.manager.dto.request.ManagerSaveRequest
+import org.example.expert.domain.manager.dto.response.ManagerResponse
+import org.example.expert.domain.manager.dto.response.ManagerSaveResponse
+import org.example.expert.domain.manager.entity.Manager
+import org.example.expert.domain.manager.repository.ManagerRepository
+import org.example.expert.domain.todo.repository.TodoRepository
+import org.example.expert.domain.user.dto.response.UserResponse
+import org.example.expert.domain.user.entity.User
+import org.example.expert.domain.user.repository.UserRepository
+import org.slf4j.LoggerFactory
+import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 
-import org.example.expert.domain.common.dto.AuthUser;
-import org.example.expert.domain.common.exception.InvalidRequestException;
-import org.example.expert.domain.log.service.LogService;
-import org.example.expert.domain.manager.dto.request.ManagerSaveRequest;
-import org.example.expert.domain.manager.dto.response.ManagerResponse;
-import org.example.expert.domain.manager.dto.response.ManagerSaveResponse;
-import org.example.expert.domain.manager.entity.Manager;
-import org.example.expert.domain.manager.repository.ManagerRepository;
-import org.example.expert.domain.todo.entity.Todo;
-import org.example.expert.domain.todo.repository.TodoRepository;
-import org.example.expert.domain.user.dto.response.UserResponse;
-import org.example.expert.domain.user.entity.User;
-import org.example.expert.domain.user.repository.UserRepository;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.ObjectUtils;
-
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-
-@Slf4j
 @Service
-@RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class ManagerService {
+class ManagerService(
+    private val managerRepository: ManagerRepository,
+    private val userRepository: UserRepository,
+    private val todoRepository: TodoRepository,
+    private val logService: LogService,
+) {
+    private val log = LoggerFactory.getLogger(ManagerService::class.java)
 
-	private final ManagerRepository managerRepository;
-	private final UserRepository userRepository;
-	private final TodoRepository todoRepository;
-	private final LogService logService;
+    @Transactional
+    fun saveManager(authUser: AuthUser, todoId: Long, managerSaveRequest: ManagerSaveRequest): ManagerSaveResponse {
+        // 일정을 만든 유저
+        val user = User.fromAuthUser(authUser)
+        val todo = todoRepository.findByIdWithUser(todoId) ?: throw InvalidRequestException("Todo not found")
 
-	@Transactional
-	public ManagerSaveResponse saveManager(AuthUser authUser, long todoId, ManagerSaveRequest managerSaveRequest) {
-		// 일정을 만든 유저
-		User user = User.fromAuthUser(authUser);
-		Todo todo = todoRepository.findById(todoId)
-			.orElseThrow(() -> new InvalidRequestException("Todo not found"));
+        if (user.id != todo.user.id) {
+            throw InvalidRequestException("담당자를 등록하려고 하는 유저가 유효하지 않거나, 일정을 만든 유저가 아닙니다.")
+        }
 
-		if (todo.getUser() == null || !ObjectUtils.nullSafeEquals(user.getId(), todo.getUser().getId())) {
-			throw new InvalidRequestException("담당자를 등록하려고 하는 유저가 유효하지 않거나, 일정을 만든 유저가 아닙니다.");
-		}
+        val managerUser = userRepository.getUserById(managerSaveRequest.managerUserId)
+            ?: throw InvalidRequestException("등록하려고 하는 담당자 유저가 존재하지 않습니다.")
 
-		User managerUser = userRepository.findById(managerSaveRequest.getManagerUserId())
-			.orElseThrow(() -> new InvalidRequestException("등록하려고 하는 담당자 유저가 존재하지 않습니다."));
+        if (user.id == managerUser.id) {
+            throw InvalidRequestException("일정 작성자는 본인을 담당자로 등록할 수 없습니다.")
+        }
 
-		if (ObjectUtils.nullSafeEquals(user.getId(), managerUser.getId())) {
-			throw new InvalidRequestException("일정 작성자는 본인을 담당자로 등록할 수 없습니다.");
-		}
+        val newManagerUser = Manager(
+            user = managerUser,
+            todo = todo
+        )
+        val savedManagerUser = managerRepository.save(newManagerUser)
 
-		Manager newManagerUser = new Manager(managerUser, todo);
-		Manager savedManagerUser = managerRepository.save(newManagerUser);
+        runCatching {
+            logService.saveLog(
+                requestUserId = user.id,
+                managerUserId = managerUser.id,
+                todoId = todo.id
+            )
+        }.onFailure { e ->
+            log.error("Log 저장 실패 :  ${e.message}", e)
+        }
 
-		try {
-			logService.saveLog(user.getId(), managerUser.getId(), todo.getId());
-		} catch (Exception e) {
-			log.error("Log 저장 실패 :  {}", e.getMessage(), e);
-		}
+        return ManagerSaveResponse(
+            id = savedManagerUser.id,
+            user = UserResponse(
+                id = managerUser.id,
+                email = managerUser.email
+            )
+        )
+    }
 
-		return new ManagerSaveResponse(
-			savedManagerUser.getId(),
-			new UserResponse(managerUser.getId(), managerUser.getEmail())
-		);
-	}
+    fun getManagers(todoId: Long): List<ManagerResponse> {
+        val todo = todoRepository.getTodoById(todoId)
+            ?: throw InvalidRequestException("Todo not found")
 
-	public List<ManagerResponse> getManagers(long todoId) {
-		Todo todo = todoRepository.findById(todoId)
-			.orElseThrow(() -> new InvalidRequestException("Todo not found"));
+        return managerRepository.findWithUserByTodoId(todo.id)
+            .map { manager ->
+                ManagerResponse(
+                    id = manager.id,
+                    user = UserResponse(
+                        id = manager.user.id,
+                        email = manager.user.email
+                    )
+                )
+            }
+    }
 
-		List<Manager> managerList = managerRepository.findByTodoIdWithUser(todo.getId());
+    @Transactional
+    fun deleteManager(authUser: AuthUser, todoId: Long, managerId: Long) {
+        val user = User.fromAuthUser(authUser)
 
-		List<ManagerResponse> dtoList = new ArrayList<>();
-		for (Manager manager : managerList) {
-			User user = manager.getUser();
-			dtoList.add(new ManagerResponse(
-				manager.getId(),
-				new UserResponse(user.getId(), user.getEmail())
-			));
-		}
-		return dtoList;
-	}
+        val todo = todoRepository.findByIdWithUser(todoId)
+            ?: throw InvalidRequestException("Todo not found")
 
-	@Transactional
-	public void deleteManager(AuthUser authUser, long todoId, long managerId) {
-		User user = User.fromAuthUser(authUser);
+        if (user.id != todo.user.id) {
+            throw InvalidRequestException("해당 일정을 만든 유저가 유효하지 않습니다.")
+        }
 
-		Todo todo = todoRepository.findById(todoId)
-			.orElseThrow(() -> new InvalidRequestException("Todo not found"));
+        val manager = managerRepository.findWithTodoById(managerId)
+            ?: throw InvalidRequestException("Manager not found")
 
-		if (todo.getUser() == null || !ObjectUtils.nullSafeEquals(user.getId(), todo.getUser().getId())) {
-			throw new InvalidRequestException("해당 일정을 만든 유저가 유효하지 않습니다.");
-		}
+        if (todo.id != manager.todo.id) {
+            throw InvalidRequestException("해당 일정에 등록된 담당자가 아닙니다.")
+        }
 
-		Manager manager = managerRepository.findById(managerId)
-			.orElseThrow(() -> new InvalidRequestException("Manager not found"));
-
-		if (!ObjectUtils.nullSafeEquals(todo.getId(), manager.getTodo().getId())) {
-			throw new InvalidRequestException("해당 일정에 등록된 담당자가 아닙니다.");
-		}
-
-		managerRepository.delete(manager);
-	}
+        managerRepository.delete(manager)
+    }
 }

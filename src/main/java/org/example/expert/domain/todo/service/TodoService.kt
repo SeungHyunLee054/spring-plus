@@ -1,110 +1,99 @@
-package org.example.expert.domain.todo.service;
+package org.example.expert.domain.todo.service
 
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-
-import org.example.expert.client.weather.WeatherClient;
-import org.example.expert.domain.common.dto.AuthUser;
-import org.example.expert.domain.common.exception.InvalidRequestException;
-import org.example.expert.domain.todo.dto.request.TodoSaveRequest;
-import org.example.expert.domain.todo.dto.response.TodoResponse;
-import org.example.expert.domain.todo.dto.response.TodoSaveResponse;
-import org.example.expert.domain.todo.dto.response.TodoSearchResponse;
-import org.example.expert.domain.todo.entity.Todo;
-import org.example.expert.domain.todo.repository.TodoRepository;
-import org.example.expert.domain.user.dto.response.UserResponse;
-import org.example.expert.domain.user.entity.User;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import lombok.RequiredArgsConstructor;
+import org.example.expert.client.weather.WeatherClient
+import org.example.expert.domain.common.dto.AuthUser
+import org.example.expert.domain.common.exception.InvalidRequestException
+import org.example.expert.domain.todo.dto.request.TodoSaveRequest
+import org.example.expert.domain.todo.dto.response.TodoResponse
+import org.example.expert.domain.todo.dto.response.TodoSaveResponse
+import org.example.expert.domain.todo.dto.response.TodoSearchResponse
+import org.example.expert.domain.todo.entity.Todo
+import org.example.expert.domain.todo.repository.TodoRepository
+import org.example.expert.domain.user.dto.response.UserResponse
+import org.example.expert.domain.user.entity.User
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.Pageable
+import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
+import java.time.LocalDate
+import java.time.LocalDateTime
 
 @Service
-@RequiredArgsConstructor
-public class TodoService {
+@Transactional(readOnly = true)
+class TodoService(private val todoRepository: TodoRepository, private val weatherClient: WeatherClient) {
 
-	private final TodoRepository todoRepository;
-	private final WeatherClient weatherClient;
+    @Transactional
+    fun saveTodo(authUser: AuthUser, todoSaveRequest: TodoSaveRequest): TodoSaveResponse {
+        val user = User.fromAuthUser(authUser)
 
-	@Transactional
-	public TodoSaveResponse saveTodo(AuthUser authUser, TodoSaveRequest todoSaveRequest) {
-		User user = User.fromAuthUser(authUser);
+        val weather = weatherClient.getTodayWeather()
 
-		String weather = weatherClient.getTodayWeather();
+        val newTodo = Todo(
+            title = todoSaveRequest.title,
+            contents = todoSaveRequest.contents,
+            weather = weather,
+            user = user
+        )
+        val savedTodo = todoRepository.save(newTodo)
 
-		Todo newTodo = new Todo(
-			todoSaveRequest.getTitle(),
-			todoSaveRequest.getContents(),
-			weather,
-			user
-		);
-		Todo savedTodo = todoRepository.save(newTodo);
+        return TodoSaveResponse(
+            id = savedTodo.id,
+            title = savedTodo.title,
+            contents = savedTodo.contents,
+            weather = weather,
+            user = UserResponse(user.id, user.email)
+        )
+    }
 
-		return new TodoSaveResponse(
-			savedTodo.getId(),
-			savedTodo.getTitle(),
-			savedTodo.getContents(),
-			weather,
-			new UserResponse(user.getId(), user.getEmail())
-		);
-	}
+    fun getTodos(
+        page: Int, size: Int, weather: String?, modifiedFrom: LocalDate?,
+        modifiedTo: LocalDate?,
+    ): Page<TodoResponse> {
+        val (startDateTime, endDateTime) = Pair(modifiedFrom, modifiedTo)
+            .validateDateRange("수정일 검색은 시작일과 종료일을 모두 입력해야 합니다.")
 
-	@Transactional(readOnly = true)
-	public Page<TodoResponse> getTodos(int page, int size, String weather, LocalDate modifiedFrom,
-		LocalDate modifiedTo) {
-		if ((modifiedFrom != null && modifiedTo == null || (modifiedFrom == null && modifiedTo != null))) {
-			throw new InvalidRequestException("수정일 검색은 시작일과 종료일을 모두 입력해야 합니다.");
-		}
+        val pageable: Pageable = PageRequest.of(page - 1, size)
 
-		Pageable pageable = PageRequest.of(page - 1, size);
+        val todos = todoRepository.findTodosByWeatherAndDateRange(
+            weather = weather,
+            modifiedFrom = startDateTime,
+            modifiedTo = endDateTime,
+            pageable = pageable
+        )
 
-		LocalDateTime startDateTime = modifiedFrom != null ? modifiedFrom.atStartOfDay() : null;
-		LocalDateTime endDateTime = modifiedTo != null ? modifiedTo.atTime(23, 59, 59) : null;
-		Page<Todo> todos = todoRepository.findTodosByWeatherAndDateRange(weather, startDateTime,
-			endDateTime, pageable);
+        return todos.map(TodoResponse::from)
+    }
 
-		return todos.map(todo -> new TodoResponse(
-			todo.getId(),
-			todo.getTitle(),
-			todo.getContents(),
-			todo.getWeather(),
-			new UserResponse(todo.getUser().getId(), todo.getUser().getEmail()),
-			todo.getCreatedAt(),
-			todo.getModifiedAt()
-		));
-	}
+    fun getTodo(todoId: Long): TodoResponse {
+        val todo = todoRepository.findByIdWithUser(todoId)
+            ?: throw InvalidRequestException("Todo not found")
 
-	@Transactional(readOnly = true)
-	public TodoResponse getTodo(long todoId) {
-		Todo todo = todoRepository.findByIdWithUser(todoId)
-			.orElseThrow(() -> new InvalidRequestException("Todo not found"));
+        return todo.let(TodoResponse::from)
+    }
 
-		User user = todo.getUser();
+    fun searchTodos(
+        keyword: String?, managerNickname: String?, createdFrom: LocalDate?, createdTo: LocalDate?,
+        pageable: Pageable,
+    ): Page<TodoSearchResponse> {
+        val (startDateTime, endDateTime) = Pair(createdFrom, createdTo)
+            .validateDateRange("생성일 검색은 시작일과 종료일을 모두 입력해야 합니다.")
 
-		return new TodoResponse(
-			todo.getId(),
-			todo.getTitle(),
-			todo.getContents(),
-			todo.getWeather(),
-			new UserResponse(user.getId(), user.getEmail()),
-			todo.getCreatedAt(),
-			todo.getModifiedAt()
-		);
-	}
+        return todoRepository.searchTodos(
+            keyword = keyword,
+            managerNickname = managerNickname,
+            startDateTime = startDateTime,
+            endDateTime = endDateTime,
+            pageable = pageable
+        )
+    }
 
-	@Transactional(readOnly = true)
-	public Page<TodoSearchResponse> searchTodos(String keyword, String managerNickname, LocalDate createdFrom, LocalDate createdTo,
-		Pageable pageable) {
-		if ((createdFrom != null && createdTo == null || (createdFrom == null && createdTo != null))) {
-			throw new InvalidRequestException("생성일 검색은 시작일과 종료일을 모두 입력해야 합니다.");
-		}
+    private fun Pair<LocalDate?, LocalDate?>.validateDateRange(errorMessage: String):
+            Pair<LocalDateTime?, LocalDateTime?> {
+        if ((first == null).xor(second == null)) {
+            throw InvalidRequestException(errorMessage)
+        }
 
-		LocalDateTime startDateTime = createdFrom != null ? createdFrom.atStartOfDay() : null;
-		LocalDateTime endDateTime = createdTo != null ? createdTo.atTime(23, 59, 59) : null;
-
-		return todoRepository.searchTodos(keyword, managerNickname, startDateTime, endDateTime, pageable);
-	}
+        return Pair(first?.atStartOfDay(), second?.atTime(23, 59, 59))
+    }
 }

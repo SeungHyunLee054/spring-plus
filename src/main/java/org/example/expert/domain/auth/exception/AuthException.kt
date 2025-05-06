@@ -1,8 +1,5 @@
-package org.example.expert.domain.auth.exception;
+package org.example.expert.domain.auth.exception
 
-public class AuthException extends RuntimeException {
-
-    public AuthException(String message) {
-        super(message);
-    }
-}
+class AuthException(
+    override val message: String,
+) : RuntimeException(message)

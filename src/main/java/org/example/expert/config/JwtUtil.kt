@@ -1,67 +1,60 @@
-package org.example.expert.config;
+package org.example.expert.config
 
-import java.security.Key;
-import java.util.Base64;
-import java.util.Date;
+import io.jsonwebtoken.Claims
+import io.jsonwebtoken.Jwts
+import io.jsonwebtoken.SignatureAlgorithm
+import io.jsonwebtoken.security.Keys
+import org.example.expert.domain.common.exception.ServerException
+import org.example.expert.domain.user.enums.UserRole
+import org.springframework.beans.factory.annotation.Value
+import org.springframework.stereotype.Component
+import org.springframework.util.StringUtils
+import java.security.Key
+import java.util.*
 
-import org.example.expert.domain.common.exception.ServerException;
-import org.example.expert.domain.user.enums.UserRole;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
-
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
-import io.jsonwebtoken.security.Keys;
-import jakarta.annotation.PostConstruct;
-import lombok.extern.slf4j.Slf4j;
-
-@Slf4j(topic = "JwtUtil")
 @Component
-public class JwtUtil {
+class JwtUtil(@Value("\${jwt.secret.key}") private val secretKey: String) {
+    companion object {
+        private const val BEARER_PREFIX = "Bearer "
+        private const val TOKEN_TIME = 60 * 60 * 1000L // 60분
+        private val signatureAlgorithm = SignatureAlgorithm.HS256
+    }
 
-	private static final String BEARER_PREFIX = "Bearer ";
-	private static final long TOKEN_TIME = 60 * 60 * 1000L; // 60분
+    private val key: Key by lazy {
+        secretKey.let {
+            Base64.getDecoder().decode(it)
+        }.let { bytes ->
+            Keys.hmacShaKeyFor(bytes)
+        }
+    }
 
-	@Value("${jwt.secret.key}")
-	private String secretKey;
-	private Key key;
-	private final SignatureAlgorithm signatureAlgorithm = SignatureAlgorithm.HS256;
+    fun createToken(userId: Long?, email: String?, userRole: UserRole?, nickname: String?): String =
+        Date().let { date ->
+            BEARER_PREFIX +
+                    Jwts.builder()
+                        .setSubject(userId.toString())
+                        .claim("email", email)
+                        .claim("userRole", userRole)
+                        .claim("nickname", nickname)
+                        .setExpiration(Date(date.time + TOKEN_TIME))
+                        .setIssuedAt(date) // 발급일
+                        .signWith(key, signatureAlgorithm) // 암호화 알고리즘
+                        .compact()
+        }
 
-	@PostConstruct
-	public void init() {
-		byte[] bytes = Base64.getDecoder().decode(secretKey);
-		key = Keys.hmacShaKeyFor(bytes);
-	}
+    fun substringToken(tokenValue: String): String =
+        when {
+            StringUtils.hasText(tokenValue) && tokenValue.startsWith(BEARER_PREFIX) ->
+                tokenValue.substring(7)
 
-	public String createToken(Long userId, String email, UserRole userRole, String nickname) {
-		Date date = new Date();
+            else -> throw ServerException("Not Found Token")
+        }
 
-		return BEARER_PREFIX +
-			Jwts.builder()
-				.setSubject(String.valueOf(userId))
-				.claim("email", email)
-				.claim("userRole", userRole)
-				.claim("nickname", nickname)
-				.setExpiration(new Date(date.getTime() + TOKEN_TIME))
-				.setIssuedAt(date) // 발급일
-				.signWith(key, signatureAlgorithm) // 암호화 알고리즘
-				.compact();
-	}
-
-	public String substringToken(String tokenValue) {
-		if (StringUtils.hasText(tokenValue) && tokenValue.startsWith(BEARER_PREFIX)) {
-			return tokenValue.substring(7);
-		}
-		throw new ServerException("Not Found Token");
-	}
-
-	public Claims extractClaims(String token) {
-		return Jwts.parserBuilder()
-			.setSigningKey(key)
-			.build()
-			.parseClaimsJws(token)
-			.getBody();
-	}
+    fun extractClaims(token: String): Claims? {
+        return Jwts.parserBuilder()
+            .setSigningKey(key)
+            .build()
+            .parseClaimsJws(token)
+            .getBody()
+    }
 }

@@ -1,34 +1,24 @@
-package org.example.expert.domain.auth.dto.request;
+package org.example.expert.domain.auth.dto.request
 
-import org.example.expert.domain.common.validator.ImageFile;
-import org.springframework.web.multipart.MultipartFile;
+import jakarta.validation.constraints.Email
+import jakarta.validation.constraints.NotBlank
+import org.example.expert.domain.common.validator.ImageFile
+import org.springframework.web.multipart.MultipartFile
 
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+data class SignupRequest(
+    @NotBlank
+    @Email
+    val email: String,
 
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-public class SignupRequest {
+    @NotBlank
+    val password: String,
 
-	@NotBlank
-	@Email
-	private String email;
+    @NotBlank
+    val nickname: String,
 
-	@NotBlank
-	private String password;
+    @NotBlank
+    val userRole: String,
 
-	@NotBlank
-	private String nickname;
-
-	@NotBlank
-	private String userRole;
-
-	@ImageFile
-	private MultipartFile profileImage;
-}
+    @ImageFile
+    val profileImage: MultipartFile
+)

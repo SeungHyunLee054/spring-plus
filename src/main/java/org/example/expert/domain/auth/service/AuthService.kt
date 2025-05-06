@@ -1,71 +1,77 @@
-package org.example.expert.domain.auth.service;
+package org.example.expert.domain.auth.service
 
-import org.example.expert.client.s3.S3Service;
-import org.example.expert.config.JwtUtil;
-import org.example.expert.config.PasswordEncoder;
-import org.example.expert.domain.auth.dto.request.SigninRequest;
-import org.example.expert.domain.auth.dto.request.SignupRequest;
-import org.example.expert.domain.auth.dto.response.SigninResponse;
-import org.example.expert.domain.auth.dto.response.SignupResponse;
-import org.example.expert.domain.auth.exception.AuthException;
-import org.example.expert.domain.common.exception.InvalidRequestException;
-import org.example.expert.domain.user.entity.User;
-import org.example.expert.domain.user.enums.UserRole;
-import org.example.expert.domain.user.repository.UserRepository;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import lombok.RequiredArgsConstructor;
+import org.example.expert.client.s3.S3Service
+import org.example.expert.config.JwtUtil
+import org.example.expert.config.PasswordEncoder
+import org.example.expert.domain.auth.dto.request.SigninRequest
+import org.example.expert.domain.auth.dto.request.SignupRequest
+import org.example.expert.domain.auth.dto.response.SigninResponse
+import org.example.expert.domain.auth.dto.response.SignupResponse
+import org.example.expert.domain.auth.exception.AuthException
+import org.example.expert.domain.common.exception.InvalidRequestException
+import org.example.expert.domain.user.entity.User
+import org.example.expert.domain.user.enums.UserRole
+import org.example.expert.domain.user.repository.UserRepository
+import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 
 @Service
-@RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class AuthService {
+class AuthService(
+    private val userRepository: UserRepository,
+    private val passwordEncoder: PasswordEncoder,
+    private val jwtUtil: JwtUtil,
+    private val s3Service: S3Service
+) {
 
-	private final UserRepository userRepository;
-	private final PasswordEncoder passwordEncoder;
-	private final JwtUtil jwtUtil;
-	private final S3Service s3Service;
+    @Transactional
+    fun signup(signupRequest: SignupRequest): SignupResponse {
+        if (userRepository.existsByEmail(signupRequest.email)) {
+            throw InvalidRequestException("이미 존재하는 이메일입니다.")
+        }
 
-	@Transactional
-	public SignupResponse signup(SignupRequest signupRequest) {
-		if (userRepository.existsByEmail(signupRequest.getEmail())) {
-			throw new InvalidRequestException("이미 존재하는 이메일입니다.");
-		}
+        val encodedPassword = passwordEncoder.encode(signupRequest.password)
 
-		String encodedPassword = passwordEncoder.encode(signupRequest.getPassword());
+        val userRole = UserRole.of(signupRequest.userRole)
 
-		UserRole userRole = UserRole.of(signupRequest.getUserRole());
+        val profileImageUrl = s3Service.uploadAndGetUrl(signupRequest.profileImage)
 
-		String profileImageUrl = s3Service.uploadAndGetUrl(signupRequest.getProfileImage());
+        val newUser = User(
+            email = signupRequest.email,
+            password = encodedPassword,
+            nickname = signupRequest.nickname,
+            profileImage = profileImageUrl,
+            userRole = userRole
+        )
 
-		User newUser = User.builder()
-			.email(signupRequest.getEmail())
-			.password(encodedPassword)
-			.nickname(signupRequest.getNickname())
-			.profileImage(profileImageUrl)
-			.userRole(userRole)
-			.build();
+        val savedUser = userRepository.save(newUser)
 
-		User savedUser = userRepository.save(newUser);
+        val bearerToken = jwtUtil.createToken(
+            userId = savedUser.id,
+            email = savedUser.email,
+            userRole = userRole,
+            nickname = savedUser.nickname
+        )
 
-		String bearerToken = jwtUtil.createToken(savedUser.getId(), savedUser.getEmail(), userRole,
-			savedUser.getNickname());
+        return SignupResponse(bearerToken)
+    }
 
-		return new SignupResponse(bearerToken);
-	}
+    fun signin(signinRequest: SigninRequest): SigninResponse {
+        val user = userRepository.findByEmail(signinRequest.email)
+            ?: throw InvalidRequestException("가입되지 않은 유저입니다.")
 
-	public SigninResponse signin(SigninRequest signinRequest) {
-		User user = userRepository.findByEmail(signinRequest.getEmail())
-			.orElseThrow(() -> new InvalidRequestException("가입되지 않은 유저입니다."));
+        // 로그인 시 이메일과 비밀번호가 일치하지 않을 경우 401을 반환합니다.
+        if (!passwordEncoder.matches(signinRequest.password, user.password)) {
+            throw AuthException("잘못된 비밀번호입니다.")
+        }
 
-		// 로그인 시 이메일과 비밀번호가 일치하지 않을 경우 401을 반환합니다.
-		if (!passwordEncoder.matches(signinRequest.getPassword(), user.getPassword())) {
-			throw new AuthException("잘못된 비밀번호입니다.");
-		}
+        val bearerToken = jwtUtil.createToken(
+            userId = user.id,
+            email = user.email,
+            userRole = user.userRole,
+            nickname = user.nickname
+        )
 
-		String bearerToken = jwtUtil.createToken(user.getId(), user.getEmail(), user.getUserRole(), user.getNickname());
-
-		return new SigninResponse(bearerToken);
-	}
+        return SigninResponse(bearerToken)
+    }
 }

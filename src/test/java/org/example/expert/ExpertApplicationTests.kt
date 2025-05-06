@@ -1,13 +1,11 @@
-package org.example.expert;
+package org.example.expert
 
-import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
+import org.junit.jupiter.api.Test
+import org.springframework.boot.test.context.SpringBootTest
 
 @SpringBootTest
-class ExpertApplicationTests {
-
+internal class ExpertApplicationTests {
     @Test
-    void contextLoads() {
+    fun contextLoads() {
     }
-
 }

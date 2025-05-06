@@ -1,68 +1,51 @@
-package org.example.expert.domain.common.validator;
+package org.example.expert.domain.common.validator
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.List;
-import java.util.Objects;
+import jakarta.validation.ConstraintValidator
+import jakarta.validation.ConstraintValidatorContext
+import org.apache.tika.Tika
+import org.springframework.web.multipart.MultipartFile
 
-import org.apache.tika.Tika;
-import org.springframework.web.multipart.MultipartFile;
+class ImageFileValidator : ConstraintValidator<ImageFile, Any> {
+    override fun isValid(value: Any, context: ConstraintValidatorContext): Boolean =
+        when (value) {
+            is MultipartFile -> isImage(value)
+            is List<*> -> value.filterIsInstance<MultipartFile>()
+                .all { isImage(it) }
 
-import jakarta.validation.ConstraintValidator;
-import jakarta.validation.ConstraintValidatorContext;
+            else -> true
+        }
 
-public class ImageFileValidator implements ConstraintValidator<ImageFile, Object> {
-	private static final Tika tika = new Tika();
-	private static final long MAX_FILE_SIZE = 1024 * 1024; // 1MB
-	private static final List<String> VALID_MIME_TYPES = List.of(
-		"image/jpeg",
-		"image/pjpeg",
-		"image/png",
-		"image/gif",
-		"image/bmp",
-		"image/x-windows-bmp"
-	);
+    private fun isImage(file: MultipartFile): Boolean {
+        if (file.isEmpty) {
+            return false
+        }
 
-	@Override
-	public boolean isValid(Object value, ConstraintValidatorContext context) {
-		if (Objects.isNull(value)) {
-			return true;
-		}
+        val originalFilename = file.originalFilename ?: return false
+        if (originalFilename.contains("..")) {
+            return false
+        }
 
-		if (value instanceof MultipartFile) {
-			return isImage((MultipartFile)value);
-		}
+        if (file.size > MAX_FILE_SIZE) {
+            return false
+        }
 
-		if (value instanceof List<?> list) {
-			return list.stream()
-				.filter(element -> element instanceof MultipartFile)
-				.map(element -> (MultipartFile)element)
-				.allMatch(this::isImage);
-		}
+        return runCatching {
+            file.inputStream.use { inputStream ->
+                tika.detect(inputStream) in VALID_MIME_TYPES
+            }
+        }.getOrDefault(false)
+    }
 
-		return true;
-	}
-
-	private boolean isImage(MultipartFile file) {
-		if (file.isEmpty()) {
-			return false;
-		}
-
-		String originalFilename = file.getOriginalFilename();
-		if (originalFilename == null || originalFilename.contains("..")) {
-			return false;
-		}
-
-		if (file.getSize() > MAX_FILE_SIZE) {
-			return false;
-		}
-
-		try (InputStream inputStream = file.getInputStream()) {
-			String mimeType = tika.detect(inputStream);
-
-			return VALID_MIME_TYPES.contains(mimeType);
-		} catch (IOException e) {
-			return false;
-		}
-	}
+    companion object {
+        private val tika = Tika()
+        private const val MAX_FILE_SIZE = (1024 * 1024) // 1MB
+        private val VALID_MIME_TYPES = setOf(
+            "image/jpeg",
+            "image/pjpeg",
+            "image/png",
+            "image/gif",
+            "image/bmp",
+            "image/x-windows-bmp"
+        )
+    }
 }

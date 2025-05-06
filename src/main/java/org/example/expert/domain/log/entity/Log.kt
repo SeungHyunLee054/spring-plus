@@ -1,32 +1,18 @@
-package org.example.expert.domain.log.entity;
+package org.example.expert.domain.log.entity
 
-import org.example.expert.domain.common.entity.Timestamped;
+import jakarta.persistence.*
+import org.example.expert.domain.common.entity.Timestamped
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-
-@Getter
 @Entity
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-@Table(name = "log")
-public class Log extends Timestamped {
-	@Id
-	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	private Long id;
+@Table(name = "logs")
+class Log(
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    var id: Long? = null,
 
-	private Long requestUserId;
+    var requestUserId: Long? = null,
 
-	private Long managerUserId;
+    var managerUserId: Long? = null,
 
-	private Long todoId;
-
-}
+    var todoId: Long? = null,
+) : Timestamped()

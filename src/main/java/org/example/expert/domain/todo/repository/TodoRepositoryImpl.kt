@@ -1,91 +1,120 @@
-package org.example.expert.domain.todo.repository;
+package org.example.expert.domain.todo.repository
 
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
-
-import org.example.expert.domain.comment.entity.QComment;
-import org.example.expert.domain.manager.entity.QManager;
-import org.example.expert.domain.todo.dto.response.TodoSearchResponse;
-import org.example.expert.domain.todo.entity.QTodo;
-import org.example.expert.domain.todo.entity.Todo;
-import org.example.expert.domain.user.entity.QUser;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.Pageable;
-import org.springframework.stereotype.Repository;
-
-import com.querydsl.core.BooleanBuilder;
-import com.querydsl.core.types.Projections;
-import com.querydsl.core.types.dsl.Wildcard;
-import com.querydsl.jpa.impl.JPAQueryFactory;
-
-import lombok.RequiredArgsConstructor;
+import com.querydsl.core.BooleanBuilder
+import com.querydsl.core.types.Projections
+import com.querydsl.jpa.impl.JPAQueryFactory
+import org.example.expert.domain.comment.entity.QComment
+import org.example.expert.domain.manager.entity.QManager
+import org.example.expert.domain.todo.dto.response.TodoSearchResponse
+import org.example.expert.domain.todo.entity.QTodo
+import org.example.expert.domain.todo.entity.Todo
+import org.example.expert.domain.user.entity.QUser
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.PageImpl
+import org.springframework.data.domain.Pageable
+import org.springframework.stereotype.Repository
+import java.time.LocalDateTime
 
 @Repository
-@RequiredArgsConstructor
-public class TodoRepositoryImpl implements TodoCustomRepository {
-	private final JPAQueryFactory jpaQueryFactory;
+class TodoRepositoryImpl(private val jpaQueryFactory: JPAQueryFactory) : TodoCustomRepository {
 
-	@Override
-	public Optional<Todo> findByIdWithUser(Long todoId) {
-		QTodo todo = QTodo.todo;
+    override fun findByIdWithUser(todoId: Long): Todo? {
+        val todo = QTodo.todo
 
-		return Optional.ofNullable(jpaQueryFactory.select(todo)
-			.from(todo)
-			.leftJoin(todo.user)
-			.fetchJoin()
-			.where(todo.id.eq(todoId))
-			.fetchOne());
-	}
+        return jpaQueryFactory.selectFrom(todo)
+            .leftJoin(todo.user)
+            .fetchJoin()
+            .where(todo.id.eq(todoId))
+            .fetchOne()
+    }
 
-	@Override
-	public Page<TodoSearchResponse> searchTodos(String keyword, String managerNickname, LocalDateTime startDateTime,
-		LocalDateTime endDateTime, Pageable pageable) {
-		QTodo todo = QTodo.todo;
-		QManager manager = QManager.manager;
-		QComment comment = QComment.comment;
-		QUser user = QUser.user;
+    override fun findTodosByWeatherAndDateRange(
+        weather: String?,
+        modifiedFrom: LocalDateTime?,
+        modifiedTo: LocalDateTime?,
+        pageable: Pageable,
+    ): Page<Todo> {
+        val todo = QTodo.todo
 
-		BooleanBuilder builder = new BooleanBuilder();
+        val builder = BooleanBuilder().apply {
+            if (weather != null) {
+                and(todo.weather.eq(weather))
+            }
+            if (modifiedFrom != null && modifiedTo != null) {
+                and(todo.modifiedAt.between(modifiedFrom, modifiedTo))
+            }
+        }
 
-		if (keyword != null && !keyword.isBlank()) {
-			builder.and(todo.title.containsIgnoreCase(keyword));
-		}
+        val content = jpaQueryFactory
+            .selectFrom(todo)
+            .where(builder)
+            .orderBy(todo.modifiedAt.desc())
+            .offset(pageable.offset)
+            .limit(pageable.pageSize.toLong())
+            .fetch()
 
-		if (managerNickname != null && !managerNickname.isBlank()) {
-			builder.and(manager.user.nickname.containsIgnoreCase(managerNickname));
-		}
+        val totalCount = jpaQueryFactory
+            .select(todo.id.count())
+            .from(todo)
+            .where(builder)
+            .fetchOne() ?: 0L
 
-		if (startDateTime != null && endDateTime != null) {
-			builder.and(todo.createdAt.between(startDateTime, endDateTime));
-		}
+        return PageImpl(content, pageable, totalCount)
+    }
 
-		List<TodoSearchResponse> content = jpaQueryFactory
-			.select(Projections.constructor(TodoSearchResponse.class,
-				todo.id,
-				todo.title,
-				manager.count(),
-				comment.count()))
-			.from(todo)
-			.leftJoin(manager).on(manager.todo.eq(todo))
-			.leftJoin(comment).on(comment.todo.eq(todo))
-			.leftJoin(manager.user, user)
-			.where(builder)
-			.groupBy(todo.id)
-			.orderBy(todo.createdAt.desc())
-			.offset(pageable.getOffset())
-			.limit(pageable.getPageSize())
-			.fetch();
+    override fun searchTodos(
+        keyword: String?,
+        managerNickname: String?,
+        startDateTime: LocalDateTime?,
+        endDateTime: LocalDateTime?,
+        pageable: Pageable,
+    ): Page<TodoSearchResponse> {
+        val todo = QTodo.todo
+        val manager = QManager.manager
+        val comment = QComment.comment
+        val user = QUser.user
 
-		long totalCount = Optional.ofNullable(jpaQueryFactory
-				.select(Wildcard.count)
-				.from(todo)
-				.where(builder)
-				.fetchOne())
-			.orElse(0L);
+        val builder = BooleanBuilder().apply {
+            if (!keyword.isNullOrBlank()) {
+                and(todo.title.containsIgnoreCase(keyword))
+            }
 
-		return new PageImpl<>(content, pageable, totalCount);
-	}
+            if (!managerNickname.isNullOrBlank()) {
+                and(manager.user.nickname.containsIgnoreCase(managerNickname))
+            }
 
+            if (startDateTime != null && endDateTime != null) {
+                and(todo.createdAt.between(startDateTime, endDateTime))
+            }
+        }
+
+        val content = jpaQueryFactory
+            .select(
+                Projections.constructor(
+                    TodoSearchResponse::class.java,
+                    todo.id,
+                    todo.title,
+                    manager.count(),
+                    comment.count()
+                )
+            )
+            .from(todo)
+            .leftJoin(manager).on(manager.todo.eq(todo))
+            .leftJoin(comment).on(comment.todo.eq(todo))
+            .leftJoin(manager.user, user)
+            .where(builder)
+            .groupBy(todo.id)
+            .orderBy(todo.createdAt.desc())
+            .offset(pageable.offset)
+            .limit(pageable.pageSize.toLong())
+            .fetch()
+
+        val totalCount = jpaQueryFactory
+            .select(todo.id.count())
+            .from(todo)
+            .where(builder)
+            .fetchOne() ?: 0L
+
+        return PageImpl(content, pageable, totalCount)
+    }
 }

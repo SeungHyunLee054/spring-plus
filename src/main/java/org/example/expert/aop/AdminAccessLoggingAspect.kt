@@ -1,31 +1,27 @@
-package org.example.expert.aop;
+package org.example.expert.aop
 
-import java.time.LocalDateTime;
+import jakarta.servlet.http.HttpServletRequest
+import org.aspectj.lang.JoinPoint
+import org.aspectj.lang.annotation.Aspect
+import org.aspectj.lang.annotation.Before
+import org.springframework.stereotype.Component
+import java.time.LocalDateTime
 
-import org.aspectj.lang.JoinPoint;
-import org.aspectj.lang.annotation.Aspect;
-import org.aspectj.lang.annotation.Before;
-import org.springframework.stereotype.Component;
 
-import jakarta.servlet.http.HttpServletRequest;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-
-@Slf4j
 @Aspect
 @Component
-@RequiredArgsConstructor
-public class AdminAccessLoggingAspect {
+class AdminAccessLoggingAspect(private val request: HttpServletRequest) {
+    private val log = org.slf4j.LoggerFactory.getLogger(AdminAccessLoggingAspect::class.java)
 
-	private final HttpServletRequest request;
+    @Before("execution(* org.example.expert.domain.user.controller.UserAdminController.changeUserRole(..))")
+    fun logBeforeChangeUserRole(joinPoint: JoinPoint) {
+        val userId: String? = request.getAttribute("userId").toString()
+        val requestUrl = request.requestURI
+        val requestTime = LocalDateTime.now()
 
-	@Before("execution(* org.example.expert.domain.user.controller.UserAdminController.changeUserRole(..))")
-	public void logBeforeChangeUserRole(JoinPoint joinPoint) {
-		String userId = String.valueOf(request.getAttribute("userId"));
-		String requestUrl = request.getRequestURI();
-		LocalDateTime requestTime = LocalDateTime.now();
-
-		log.info("Admin Access Log - User ID: {}, Request Time: {}, Request URL: {}, Method: {}",
-			userId, requestTime, requestUrl, joinPoint.getSignature().getName());
-	}
+        log.info(
+            "Admin Access Log - User ID: {}, Request Time: {}, Request URL: {}, Method: {}",
+            userId, requestTime, requestUrl, joinPoint.signature.name
+        )
+    }
 }

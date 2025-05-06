@@ -1,11 +1,6 @@
-package org.example.expert.domain.user.dto.response;
+package org.example.expert.domain.user.dto.response
 
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-
-@Getter
-@AllArgsConstructor
-public class UserSearchResponse {
-	private Long userId;
-	private String nickname;
-}
+data class UserSearchResponse(
+    val userId: Long?,
+    val nickname: String?,
+)

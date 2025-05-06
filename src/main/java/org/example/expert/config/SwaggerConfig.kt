@@ -1,53 +1,57 @@
-package org.example.expert.config;
+package org.example.expert.config
 
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
-
-import io.swagger.v3.core.converter.ModelConverters;
-import io.swagger.v3.core.jackson.ModelResolver;
-import io.swagger.v3.oas.models.Components;
-import io.swagger.v3.oas.models.OpenAPI;
-import io.swagger.v3.oas.models.info.Info;
-import io.swagger.v3.oas.models.security.SecurityRequirement;
-import io.swagger.v3.oas.models.security.SecurityScheme;
-import jakarta.annotation.PostConstruct;
-import lombok.RequiredArgsConstructor;
+import com.fasterxml.jackson.databind.ObjectMapper
+import io.swagger.v3.core.converter.ModelConverters
+import io.swagger.v3.core.jackson.ModelResolver
+import io.swagger.v3.oas.models.Components
+import io.swagger.v3.oas.models.OpenAPI
+import io.swagger.v3.oas.models.info.Info
+import io.swagger.v3.oas.models.security.SecurityRequirement
+import io.swagger.v3.oas.models.security.SecurityScheme
+import jakarta.annotation.PostConstruct
+import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Configuration
 
 @Configuration
-@RequiredArgsConstructor
-public class SwaggerConfig {
-	private final ObjectMapper objectMapper;
+class SwaggerConfig(private val objectMapper: ObjectMapper) {
 
-	@PostConstruct
-	public void init() {
-		ModelConverters.getInstance().addConverter(new ModelResolver(objectMapper));
-	}
+    @PostConstruct
+    fun init() {
+        ModelConverters.getInstance().addConverter(ModelResolver(objectMapper))
+    }
 
-	@Bean
-	public OpenAPI openApi() {
-		return new OpenAPI()
-			.addSecurityItem(new SecurityRequirement().addList("bearer-key").addList("Refresh-Token"))
-			.components(new Components()
-				.addSecuritySchemes("bearer-key",
-					new SecurityScheme()
-						.type(SecurityScheme.Type.HTTP)
-						.scheme("bearer")
-						.bearerFormat("JWT"))
-				.addSecuritySchemes("Refresh-Token",
-					new SecurityScheme()
-						.type(SecurityScheme.Type.APIKEY)
-						.in(SecurityScheme.In.HEADER)
-						.name("Refresh-Token")
-						.description("Bearer 를 붙여서 넣어주어야 합니다.")))
-			.info(apiInfo());
-	}
+    @Bean
+    fun openApi(): OpenAPI = OpenAPI().apply {
+        addSecurityItem(
+            SecurityRequirement()
+                .addList("bearer-key")
+                .addList("Refresh-Token")
+        )
+        components = components()
+        info = apiInfo()
+    }
 
-	private Info apiInfo() {
-		return new Info()
-			.title("Spring-Plus")
-			.description("Spring-Plus 개인 프로젝트")
-			.version("1.0");
-	}
+    private fun components(): Components = Components().apply {
+        addSecuritySchemes(
+            "bearer-key",
+            SecurityScheme()
+                .type(SecurityScheme.Type.HTTP)
+                .scheme("bearer")
+                .bearerFormat("JWT")
+        )
+        addSecuritySchemes(
+            "Refresh-Token",
+            SecurityScheme()
+                .type(SecurityScheme.Type.APIKEY)
+                .`in`(SecurityScheme.In.HEADER)
+                .name("Refresh-Token")
+                .description("Bearer 를 붙여서 넣어주어야 합니다.")
+        )
+    }
+
+    private fun apiInfo(): Info = Info().apply {
+        title("Spring-Plus")
+        description("Spring-Plus 개인 프로젝트")
+        version("1.0")
+    }
 }

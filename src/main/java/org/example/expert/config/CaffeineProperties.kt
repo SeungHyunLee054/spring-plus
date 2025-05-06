@@ -1,19 +1,13 @@
-package org.example.expert.config;
+package org.example.expert.config
 
-import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.stereotype.Component;
-
-import lombok.Getter;
-import lombok.Setter;
+import org.springframework.boot.context.properties.ConfigurationProperties
+import org.springframework.stereotype.Component
 
 @ConfigurationProperties(prefix = "cache.caffeine")
 @Component
-@Getter
-@Setter
-public class CaffeineProperties {
-	private int initialCapacity;
-	private int maximumSize ;
-	private int expireAfterWrite;
-	private int expireAfterAccess;
-
-}
+data class CaffeineProperties(
+    var initialCapacity: Int = 100,
+    var maximumSize: Long = 1000,
+    var expireAfterWrite: Long = 60,
+    var expireAfterAccess: Long = 30
+)

@@ -1,80 +1,115 @@
-package org.example.expert.client.s3;
+package org.example.expert.client.s3
 
-import java.io.InputStream;
-import java.util.Objects;
-import java.util.UUID;
+import org.example.expert.domain.common.exception.ServerException
+import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Value
+import org.springframework.stereotype.Component
+import org.springframework.web.multipart.MultipartFile
+import software.amazon.awssdk.core.sync.RequestBody
+import software.amazon.awssdk.services.s3.S3Client
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest
+import software.amazon.awssdk.services.s3.model.HeadObjectRequest
+import software.amazon.awssdk.services.s3.model.PutObjectRequest
+import java.util.*
 
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
-import org.springframework.web.multipart.MultipartFile;
-
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import software.amazon.awssdk.core.sync.RequestBody;
-import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
-import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
-import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
-import software.amazon.awssdk.services.s3.model.PutObjectRequest;
-
-@Slf4j
+/**
+ * Amazon S3 파일 업로드 및 관리 서비스
+ */
 @Component
-@RequiredArgsConstructor
-public class S3Service {
-	private final S3Client s3Client;
+class S3Service(
+    private val s3Client: S3Client,
+    @Value("\${cloud.aws.s3.bucket}") private val bucket: String,
+    @Value("\${cloud.aws.region.static}") private val region: String,
+) {
+    companion object {
+        private val log = LoggerFactory.getLogger(S3Service::class.java)
+        private const val S3_URL_FORMAT = "https://%s.s3.%s.amazonaws.com/%s"
+    }
 
-	@Value("${cloud.aws.s3.bucket}")
-	private String bucket;
+    /**
+     * 파일을 S3에 업로드하고 URL을 반환합니다
+     * @throws ServerException S3 업로드 실패시
+     * @return S3 이미지 URL
+     */
+    fun uploadAndGetUrl(multipartFile: MultipartFile): String? {
+        val fileName = generateFileName(multipartFile)
 
-	public String uploadAndGetUrl(MultipartFile multipartFile) {
-		String extension = Objects.requireNonNull(multipartFile.getOriginalFilename())
-			.substring(multipartFile.getOriginalFilename().lastIndexOf("."));
-		String uuid = UUID.randomUUID().toString().replaceAll("-", "");
-		String fileName = uuid + extension;
+        return runCatching {
+            uploadFile(multipartFile, fileName)
+            generateS3Url(fileName)
+        }.fold(
+            onSuccess = { it },
+            onFailure = { e ->
+                log.error("S3 업로드 실패 : ${e.message}", e)
+                null
+            }
+        )
+    }
 
-		try (InputStream inputStream = multipartFile.getInputStream()) {
-			PutObjectRequest request = PutObjectRequest.builder()
-				.bucket(bucket)
-				.key(fileName)
-				.contentLength(multipartFile.getSize())
-				.contentType(multipartFile.getContentType())
-				.build();
+    /**
+     * S3에서 파일을 삭제합니다. 파일이 없는 경우 무시됩니다.
+     * @throws ServerException S3 파일 삭제 실패시
+     */
+    fun deleteFileIfPresent(profileImageUrl: String?) {
+        profileImageUrl.takeIf { !it.isNullOrBlank() }
+            ?.let { extractFileName(it) }
+            ?.takeIf { isFileExists(it) }
+            ?.let { fileName ->
+                runCatching {
+                    deleteFile(fileName)
+                }.onFailure { e ->
+                    log.error("S3 파일 삭제 실패 : ${e.message}", e)
+                }
+            }
+    }
 
-			s3Client.putObject(request, RequestBody.fromInputStream(inputStream, multipartFile.getSize()));
+    private fun generateFileName(file: MultipartFile): String {
+        val extension = file.originalFilename?.substringAfterLast(".")
+        val uuid = UUID.randomUUID().toString().replace("-", "")
+        return "$uuid.$extension"
+    }
 
-			return String.format("https://%s.s3.ap-northeast-2.amazonaws.com/%s", bucket, fileName);
-		} catch (Exception e) {
-			log.error("S3 업로드 실패 : {}", e.getMessage(), e);
-			return null;
-		}
-	}
 
-	public void deleteFileIfPresent(String profileImageUrl) {
-		if (profileImageUrl == null || profileImageUrl.isBlank()) {
-			return;
-		}
+    private fun uploadFile(multipartFile: MultipartFile, fileName: String) {
+        multipartFile.inputStream.use { inputStream ->
+            val request = PutObjectRequest.builder()
+                .bucket(bucket)
+                .key(fileName)
+                .contentLength(multipartFile.size)
+                .contentType(multipartFile.contentType)
+                .build()
 
-		String fileName = profileImageUrl.substring(profileImageUrl.lastIndexOf("/") + 1);
+            s3Client.putObject(request, RequestBody.fromInputStream(inputStream, multipartFile.size))
+        }
+    }
 
-		try {
-			HeadObjectRequest headObjectRequest = HeadObjectRequest.builder()
-				.bucket(bucket)
-				.key(fileName)
-				.build();
+    private fun generateS3Url(fileName: String): String =
+        S3_URL_FORMAT.format(bucket, region, fileName)
 
-			s3Client.headObject(headObjectRequest);
-		} catch (NoSuchKeyException e) {
-			return;
-		}
+    private fun extractFileName(fileName: String): String =
+        fileName.substringAfterLast("/")
 
-		try {
-			s3Client.deleteObject(
-				DeleteObjectRequest.builder()
-					.bucket(bucket)
-					.key(fileName)
-					.build());
-		} catch (Exception e) {
-			log.error("S3 파일 삭제 실패 : {}", e.getMessage(), e);
-		}
-	}
+    private fun isFileExists(fileName: String): Boolean {
+        return runCatching {
+            val headObjectRequest = HeadObjectRequest.builder()
+                .bucket(bucket)
+                .key(fileName)
+                .build()
+
+            s3Client.headObject(headObjectRequest)
+        }.fold(
+            onSuccess = { true },
+            onFailure = { false }
+        )
+    }
+
+    private fun deleteFile(fileName: String) {
+        s3Client.deleteObject(
+            DeleteObjectRequest.builder()
+                .bucket(bucket)
+                .key(fileName)
+                .build()
+        )
+    }
+
 }

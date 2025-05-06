@@ -1,24 +1,21 @@
-package org.example.expert.domain.common.validator;
+package org.example.expert.domain.common.validator
 
-import static java.lang.annotation.ElementType.*;
-import static java.lang.annotation.ElementType.ANNOTATION_TYPE;
-import static java.lang.annotation.ElementType.CONSTRUCTOR;
-import static java.lang.annotation.ElementType.FIELD;
-import static java.lang.annotation.ElementType.PARAMETER;
-import static java.lang.annotation.ElementType.TYPE_USE;
-import static java.lang.annotation.RetentionPolicy.*;
+import jakarta.validation.Constraint
+import jakarta.validation.Payload
+import kotlin.reflect.KClass
 
-import java.lang.annotation.Retention;
-import java.lang.annotation.Target;
-
-import jakarta.validation.Constraint;
-import jakarta.validation.Payload;
-
-@Target({ METHOD, FIELD, ANNOTATION_TYPE, CONSTRUCTOR, PARAMETER, TYPE_USE })
-@Retention(RUNTIME)
-@Constraint(validatedBy = ImageFileValidator.class)
-public @interface ImageFile {
-    String message() default "허용된 이미지 파일이 아닙니다.";
-    Class<?>[] groups() default {};
-    Class<? extends Payload>[] payload() default {};
-}
+@Target(
+    AnnotationTarget.FUNCTION,
+    AnnotationTarget.FIELD,
+    AnnotationTarget.ANNOTATION_CLASS,
+    AnnotationTarget.CONSTRUCTOR,
+    AnnotationTarget.VALUE_PARAMETER,
+    AnnotationTarget.TYPE
+)
+@Retention(AnnotationRetention.RUNTIME)
+@Constraint(validatedBy = [ImageFileValidator::class])
+annotation class ImageFile(
+    val message: String = "허용된 이미지 파일이 아닙니다.",
+    val groups: Array<KClass<*>> = [],
+    val payload: Array<KClass<out Payload>> = []
+)

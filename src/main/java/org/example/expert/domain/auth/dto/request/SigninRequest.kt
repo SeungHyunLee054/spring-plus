@@ -1,18 +1,13 @@
-package org.example.expert.domain.auth.dto.request;
+package org.example.expert.domain.auth.dto.request
 
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import jakarta.validation.constraints.Email
+import jakarta.validation.constraints.NotBlank
 
-@Getter
-@NoArgsConstructor
-@AllArgsConstructor
-public class SigninRequest {
-    
-    @NotBlank @Email
-    private String email;
+data class SigninRequest(
     @NotBlank
-    private String password;
-}
+    @Email
+    val email: String,
+
+    @NotBlank
+    val password: String
+)

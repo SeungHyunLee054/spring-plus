@@ -1,17 +1,11 @@
-package org.example.expert.domain.user.dto.request;
+package org.example.expert.domain.user.dto.request
 
-import jakarta.validation.constraints.NotBlank;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import jakarta.validation.constraints.NotBlank
 
-@Getter
-@NoArgsConstructor
-@AllArgsConstructor
-public class UserChangePasswordRequest {
+data class UserChangePasswordRequest(
+    @NotBlank
+    val oldPassword: String,
 
     @NotBlank
-    private String oldPassword;
-    @NotBlank
-    private String newPassword;
-}
+    val newPassword: String,
+)
