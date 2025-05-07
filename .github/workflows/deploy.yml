@@ -58,7 +58,5 @@ jobs:
             export MYSQL_PASSWORD=${{ secrets.MYSQL_PASSWORD }}
             export AWS_ACCESS_KEY=${{ secrets.AWS_ACCESS_KEY }}
             export AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-            
-            echo MYSQL_URL
              
             nohup java -jar ~/*.jar > ~/app.log 2>&1 &
