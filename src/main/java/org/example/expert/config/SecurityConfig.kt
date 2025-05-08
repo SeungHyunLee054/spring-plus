@@ -1,5 +1,6 @@
 package org.example.expert.config
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.security.authentication.AuthenticationManager
@@ -15,7 +16,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource
 
 @Configuration
 @EnableWebSecurity
-class SecurityConfig(jwtUtil: JwtUtil) {
+class SecurityConfig(private val objectMapper: ObjectMapper, jwtUtil: JwtUtil) {
     private val jwtFilter: JwtFilter = JwtFilter(jwtUtil)
 
     @Bean
@@ -42,6 +43,9 @@ class SecurityConfig(jwtUtil: JwtUtil) {
                     .anyRequest().authenticated()
             }
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter::class.java)
+            .exceptionHandling { exception ->
+                exception.authenticationEntryPoint(CustomAuthenticationEntryPoint(objectMapper))
+            }
             .build()
     }
 
@@ -51,7 +55,7 @@ class SecurityConfig(jwtUtil: JwtUtil) {
             allowedOrigins = listOf(
                 "http://localhost:8080",
                 "http://ec2-13-125-37-77.ap-northeast-2.compute.amazonaws.com"
-                )
+            )
             allowedMethods = listOf("GET", "POST", "PUT", "DELETE", "OPTIONS")
             allowedHeaders = listOf("*")
             exposedHeaders = listOf("*")

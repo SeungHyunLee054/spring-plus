@@ -8,7 +8,7 @@ import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.example.expert.domain.common.dto.AuthUser
 import org.example.expert.domain.user.enums.UserRole
-import org.slf4j.LoggerFactory
+import org.springframework.http.HttpStatus
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.Authentication
 import org.springframework.security.core.authority.SimpleGrantedAuthority
@@ -17,7 +17,6 @@ import org.springframework.web.filter.OncePerRequestFilter
 
 class JwtFilter(private val jwtUtil: JwtUtil) : OncePerRequestFilter() {
     companion object {
-        private val log = LoggerFactory.getLogger(JwtFilter::class.java)
         private val WHITE_LIST = listOf("/swagger", "/v3/api-docs", "/swagger-resources", "/actuator", "/auth")
     }
 
@@ -33,25 +32,26 @@ class JwtFilter(private val jwtUtil: JwtUtil) : OncePerRequestFilter() {
             return
         }
 
+        // 토큰이 없는 경우 400을 반환합니다.
         val bearerJwt = request.getHeader("Authorization") ?: run {
-            // 토큰이 없는 경우 400을 반환합니다.
-            response.sendError(HttpServletResponse.SC_BAD_REQUEST, "JWT 토큰이 필요합니다.")
-            return
+            val exception = JwtFilterException(HttpStatus.BAD_REQUEST, "JWT 토큰이 필요합니다.")
+            request.setAttribute("exception", exception)
+            throw exception
         }
 
         val jwt = jwtUtil.substringToken(bearerJwt)
-
         runCatching {
             val authentication = processJwtToken(jwt) ?: run {
-                response.sendError(HttpServletResponse.SC_BAD_REQUEST, "잘못된 JWT 토큰입니다.")
-                return
+                val exception = JwtFilterException(HttpStatus.BAD_REQUEST, "잘못된 JWT 토큰입니다.")
+                request.setAttribute("exception", exception)
+                throw exception
             }
 
             SecurityContextHolder.getContext().authentication = authentication
             filterChain.doFilter(request, response)
 
         }.onFailure { e ->
-            handleJwtError(e, response)
+            handleJwtError(e, request)
         }
     }
 
@@ -74,45 +74,33 @@ class JwtFilter(private val jwtUtil: JwtUtil) : OncePerRequestFilter() {
         )
     }
 
-    private fun handleJwtError(e: Throwable, response: HttpServletResponse) {
+    private fun handleJwtError(e: Throwable, request: HttpServletRequest) {
         when (e) {
             is SecurityException,
             is MalformedJwtException,
-                -> sendError(
-                response,
-                HttpServletResponse.SC_UNAUTHORIZED,
-                "유효하지 않는 JWT 서명입니다.",
-                e
-            )
+                -> {
+                val exception = JwtFilterException(HttpStatus.UNAUTHORIZED, "유효하지 않는 JWT 서명입니다.")
+                request.setAttribute("exception", exception)
+                throw exception
+            }
 
-            is ExpiredJwtException -> sendError(
-                response,
-                HttpServletResponse.SC_UNAUTHORIZED,
-                "만료된 JWT 토큰입니다.",
-                e
-            )
+            is ExpiredJwtException -> {
+                val exception = JwtFilterException(HttpStatus.UNAUTHORIZED, "만료된 JWT 토큰입니다.")
+                request.setAttribute("exception", exception)
+                throw exception
+            }
 
-            is UnsupportedJwtException -> sendError(
-                response,
-                HttpServletResponse.SC_BAD_REQUEST,
-                "지원되지 않는 JWT 토큰입니다.",
-                e
-            )
+            is UnsupportedJwtException -> {
+                val exception = JwtFilterException(HttpStatus.BAD_REQUEST, "지원되지 않는 JWT 토큰입니다.")
+                request.setAttribute("exception", exception)
+                throw exception
+            }
 
             else -> {
-                log.error("Internal server error", e)
-                response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR)
+                val exception = JwtFilterException(HttpStatus.INTERNAL_SERVER_ERROR, ": ${e.message}")
+                request.setAttribute("exception", exception)
+                throw exception
             }
         }
-    }
-
-    private fun sendError(
-        response: HttpServletResponse,
-        status: Int,
-        message: String,
-        e: Throwable,
-    ) {
-        log.error(message, e)
-        response.sendError(status, message)
     }
 }
