@@ -28,7 +28,7 @@ spring:
 
 jwt:
   secret:
-    key: yourSuperSecretKey1234567890yourSuperSecretKey1234567890
+    key: ${JWT_SECRET_KEY}
 
 cloud:
   aws:
