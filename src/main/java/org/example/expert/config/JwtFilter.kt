@@ -18,23 +18,17 @@ import org.springframework.web.filter.OncePerRequestFilter
 class JwtFilter(private val jwtUtil: JwtUtil) : OncePerRequestFilter() {
     companion object {
         private val log = LoggerFactory.getLogger(JwtFilter::class.java)
+        private val WHITE_LIST = listOf("/swagger", "/v3/api-docs", "/swagger-resources", "/actuator", "/auth")
     }
 
     override fun doFilterInternal(
         request: HttpServletRequest,
         response: HttpServletResponse,
-        filterChain: FilterChain
+        filterChain: FilterChain,
     ) {
         val url = request.requestURI
 
-        if (url.startsWith("/swagger") || url.startsWith("/v3/api-docs") || url.startsWith("/swagger-resources") ||
-            url.startsWith("/actuator")
-        ) {
-            filterChain.doFilter(request, response)
-            return
-        }
-
-        if (url.startsWith("/auth")) {
+        if (WHITE_LIST.stream().anyMatch { url.startsWith(it) }) {
             filterChain.doFilter(request, response)
             return
         }
@@ -83,7 +77,8 @@ class JwtFilter(private val jwtUtil: JwtUtil) : OncePerRequestFilter() {
     private fun handleJwtError(e: Throwable, response: HttpServletResponse) {
         when (e) {
             is SecurityException,
-            is MalformedJwtException -> sendError(
+            is MalformedJwtException,
+                -> sendError(
                 response,
                 HttpServletResponse.SC_UNAUTHORIZED,
                 "유효하지 않는 JWT 서명입니다.",
@@ -115,7 +110,7 @@ class JwtFilter(private val jwtUtil: JwtUtil) : OncePerRequestFilter() {
         response: HttpServletResponse,
         status: Int,
         message: String,
-        e: Throwable
+        e: Throwable,
     ) {
         log.error(message, e)
         response.sendError(status, message)
