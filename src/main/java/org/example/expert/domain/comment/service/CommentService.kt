@@ -19,7 +19,7 @@ class CommentService(private val todoRepository: TodoRepository, private val com
 
     @Transactional
     fun saveComment(authUser: AuthUser, todoId: Long, commentSaveRequest: CommentSaveRequest): CommentSaveResponse {
-        val user: User = User.Companion.fromAuthUser(authUser)
+        val user = User.fromAuthUser(authUser)
         val todo = todoRepository.getTodoById(todoId)
             ?: throw InvalidRequestException("Todo not found")
 
