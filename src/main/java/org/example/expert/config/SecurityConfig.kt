@@ -17,7 +17,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource
 @Configuration
 @EnableWebSecurity
 class SecurityConfig(private val objectMapper: ObjectMapper, jwtUtil: JwtUtil) {
-    private val jwtFilter: JwtFilter = JwtFilter(jwtUtil)
+    private val jwtFilter: JwtFilter = JwtFilter(jwtUtil, CustomAuthenticationEntryPoint(objectMapper))
 
     @Bean
     @Throws(Exception::class)
@@ -37,7 +37,8 @@ class SecurityConfig(private val objectMapper: ObjectMapper, jwtUtil: JwtUtil) {
                         "/actuator/**"
                     ).permitAll()
                     .requestMatchers(
-                        "/auth/**"
+                        "/auth/**",
+                        "/error"
                     ).permitAll()
                     .requestMatchers("/admin/**").hasRole("ADMIN")
                     .anyRequest().authenticated()

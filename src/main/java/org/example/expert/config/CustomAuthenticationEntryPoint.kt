@@ -17,22 +17,23 @@ class CustomAuthenticationEntryPoint(private val objectMapper: ObjectMapper) : A
         response: HttpServletResponse,
         authException: AuthenticationException,
     ) {
-        val exception = request.getAttribute("exception") as? JwtFilterException
+        val errorResponse = when (authException) {
+            is JwtFilterException -> {
+                ErrorResponse(
+                    status = authException.errorCode.value(),
+                    message = authException.message
+                )
+            }
 
-        val errorResponse = exception?.let {
-            log.error(exception.message, exception)
-            ErrorResponse(
-                status = it.errorCode.value(),
-                message = it.message
-            )
-        } ?: run {
-            log.error(authException.message, authException)
-            ErrorResponse(
-                status = HttpStatus.UNAUTHORIZED.value(),
-                message = "인증에 실패했습니다."
-            )
+            else -> {
+                ErrorResponse(
+                    status = HttpStatus.UNAUTHORIZED.value(),
+                    message = "인증에 실패했습니다."
+                )
+            }
         }
 
+        log.error(authException.message, authException)
         response.status = errorResponse.status
         response.contentType = MediaType.APPLICATION_JSON_VALUE
         response.characterEncoding = "UTF-8"
